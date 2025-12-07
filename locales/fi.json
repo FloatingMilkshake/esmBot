@@ -20,7 +20,6 @@
             "exec": "Suorittaa shell-komennon",
             "help": "Löytää komentolistan",
             "image": "Hakee kuvia netistä",
-            "imagereload": "Yrittää yhdistää kaikkiin saatavilla oleviin kuvankäsittelypalvelimiin",
             "info": "Löytää infoa ja kredittejä minusta",
             "lengthen": "Pidentää lyhyttä URL-osoitetta",
             "ping": "Pingaa Discordin palvelimia",
@@ -56,7 +55,6 @@
             "reddit": "Lisää Reddit vesileiman kuvaan",
             "scott": "Tekee Scott the Woz esityksen kuvasta",
             "caption": "Lisää kuvatekstin",
-            "imagestats": "Löytää tilastoja kuvapalvelimista",
             "bounce": "Tekee kuvan pomppimaan",
             "sepia": "Lisää seepia filtterin",
             "sharpen": "Terävöittää kuvaa",
@@ -532,8 +530,6 @@
             "broadcast": "lähetys",
             "count": "laske",
             "image": "kuva",
-            "imagereload": "lataakuva",
-            "imagestats": "kuvantiedot",
             "info": "tietoja",
             "lengthen": "pidennä",
             "prefix": "alkuliite",
@@ -797,17 +793,6 @@
                 "noResults": "En löytänyt tuloksia!",
                 "results": "Hae Tuloksia"
             },
-            "imagereload": {
-                "connected": "Onnistuneesti yhdistetty {{length}} kuvapalvelimiin.",
-                "couldNotConnect": "En voinut yhdistää yhteenkään kuva palvelimeen!",
-                "owner": "Vain botin omistaja voi ladata kuvapalvelimet uudelleen!"
-            },
-            "imagestats": {
-                "header": "esmBotin Kuva Tilastot",
-                "server": "Palvelin {{num}}",
-                "connected": "Botti on tällä hetkellä yhdistetty {{length}} kuvapalvelimiin.",
-                "runningJobs": "Suoritetaan Töitä: {{count}}"
-            },
             "lengthen": {
                 "noInput": "Sinun pitää antaa lyhyt URL-osoite jota pidentää!",
                 "notURL": "Tuo ei ole URL-osoite!"
@@ -840,6 +825,30 @@
                 "adminOnly": "Sinun pitää olla ylläpitäjä vaihtaaksesi botin etuliitettä!",
                 "changed": "Etuliite on vaihdettu `{{prefix}}` :seen.",
                 "current": "Nykyinen etuliite on `{{prefix}}`."
+            },
+            "raw": {
+                "noInput": "Sinun on annettava kuva/GIF saadaksesi raaka-URL-osoitteen!"
+            },
+            "reload": {
+                "botOwnerOnly": "Vain botin omistaja voi ladata komennot uudestaan!",
+                "noCommand": "En löytänyt tuota komentoa!",
+                "noInput": "Sinun täytyy antaa komento uudelleenlataamista varten!",
+                "reloaded": "Komento `{{command}}` on ladattu uudelleen.",
+                "reloadFailed": "En voinut ladata komentoa uudelleen!"
+            },
+            "remove": {
+                "invalidPosition": "Tuo ei ole kelvollinen sijainti!",
+                "notHost": "Vain nykyinen puheistunnon isäntä voi poistaa kappaleita jonosta!",
+                "removed": "Kappale `{{song}}` on poistettu jonosta."
+            },
+            "restart": {
+                "owner": "Vain botin omistaja voi käynnistää minut uudelleen!",
+                "restarting": "esmBot käynnistyy uudelleen."
+            },
+            "seek": {
+                "invalidPosition": "Tuo ei ole kelvollinen sijainti!",
+                "notHost": "Vain nykyinen puheistunnon isäntä voi etsiä musiikkia!",
+                "notSeekable": "Tämä raita ei ole haettavissa!"
             }
         },
         "noParam": {

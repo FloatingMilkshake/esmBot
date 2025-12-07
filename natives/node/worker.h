@@ -1,14 +1,15 @@
 #pragma once
-#include "../common.h"
+#include "../common/maps.h"
 #include <napi.h>
+#include <string>
 
 using namespace Napi;
 
-class ImageAsyncWorker : public AsyncWorker {
+class MediaAsyncWorker : public AsyncWorker {
 public:
-  ImageAsyncWorker(Napi::Env &env, Promise::Deferred deferred, string command, ArgumentMap inArgs, string type,
-                   const char *bufData, size_t bufSize);
-  virtual ~ImageAsyncWorker() {};
+  MediaAsyncWorker(Napi::Env &env, Promise::Deferred deferred, std::string command, esmb::ArgumentMap inArgs,
+                   std::string type, const char *bufData, size_t bufSize);
+  virtual ~MediaAsyncWorker() {};
 
   void Execute();
   void OnError(const Error &e);
@@ -19,15 +20,15 @@ public:
 private:
   Promise::Deferred deferred;
 
-  string command;
-  ArgumentMap inArgs;
-  string type;
+  std::string command;
+  esmb::ArgumentMap inArgs;
+  std::string type;
 
   const char *bufData;
   size_t bufSize;
 
-  ArgumentMap outArgs;
-  string outType;
+  CmdOutput outData;
+  std::string outType;
 
   bool shouldKill;
 };

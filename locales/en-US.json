@@ -21,8 +21,8 @@
       "exec": "Executes a shell command",
       "help": "Gets a list of commands",
       "image": "Searches for images across the web",
-      "imagereload": "Attempts to reconnect to all available image processing servers",
-      "imagestats": "Gets some statistics about the image servers",
+      "mediareload": "Attempts to reconnect to all available media processing servers",
+      "mediastats": "Gets some statistics about the media servers",
       "info": "Gets some info and credits about me",
       "lengthen": "Lengthens a short URL",
       "ping": "Pings Discord's servers",
@@ -67,6 +67,7 @@
       "scott": "Makes Scott the Woz show off an image",
       "sepia": "Adds a sepia filter",
       "sharpen": "Sharpens an image",
+      "slide": "Slides an image in a direction",
       "slow": "Makes an image sequence slower",
       "snapchat": "Adds a Snapchat style caption to an image",
       "soos": "\"Loops\" an image sequence by reversing it when it's finished",
@@ -198,6 +199,10 @@
       },
       "motivate": {
         "font": "font"
+      },
+      "slide": {
+        "reverse": "reverse",
+        "vertical": "vertical"
       },
       "slow": {
         "multiplier": "multiplier"
@@ -414,8 +419,12 @@
       "motivate": {
         "font": "Specify the font you want to use (default: times)"
       },
+      "slide": {
+        "reverse": "Changes the direction the image slides in",
+        "vertical": "Slides the image vertically"
+      },
       "slow": {
-        "multiplier": "Set the speed multiplier (default: 2)"
+        "multiplier": "Set the speed multiplier (default: 2.0)"
       },
       "snapchat": {
         "position": "Set the position of the caption as a decimal (0.0 is top, 1.0 is bottom, default is 0.565)"
@@ -427,7 +436,7 @@
         "scale": "A multiplier to resize the speech bubble (0.01 is smallest, 1.0 is largest, default is 0.2)"
       },
       "speed": {
-        "multiplier": "Set the speed multiplier (default: 2)"
+        "multiplier": "Set the speed multiplier (default: 2.0)"
       },
       "uncanny": {
         "font": "Specify the font you want to use (default: helvetica)",
@@ -542,8 +551,8 @@
       "exec": "exec",
       "help": "help",
       "image": "image",
-      "imagereload": "imagereload",
-      "imagestats": "imagestats",
+      "mediareload": "mediareload",
+      "mediastats": "mediastats",
       "info": "info",
       "lengthen": "lengthen",
       "ping": "ping",
@@ -588,6 +597,7 @@
       "scott": "scott",
       "sepia": "sepia",
       "sharpen": "sharpen",
+      "slide": "slide",
       "slow": "slow",
       "snapchat": "snapchat",
       "soos": "soos",
@@ -656,6 +666,7 @@
       "sepia": "You need to provide an image/GIF to add a sepia filter!",
       "sharpen": "You need to provide an image/GIF to sharpen!",
       "watermark shutterstock": "You need to provide an image/GIF to add a Shutterstock watermark!",
+      "slide": "You need to provide an image/GIF to slide!",
       "slow": "You need to provide an image/GIF to slow down!",
       "snapchat": "You need to provide an image/GIF to add a caption!",
       "soos": "You need to provide an image/GIF to loop!",
@@ -816,14 +827,14 @@
         "noResults": "I couldn't find any results!",
         "results": "Search Results"
       },
-      "imagereload": {
-        "connected": "Successfully connected to {{length}} image server(s).",
-        "couldNotConnect": "I couldn't connect to any image servers!",
-        "owner": "Only the bot owner can reload the image servers!"
+      "mediareload": {
+        "connected": "Successfully connected to {{length}} media server(s).",
+        "couldNotConnect": "I couldn't connect to any media servers!",
+        "owner": "Only the bot owner can reload the media servers!"
       },
-      "imagestats": {
-        "connected": "The bot is currently connected to {{length}} image server(s).",
-        "header": "esmBot Image Statistics",
+      "mediastats": {
+        "connected": "The bot is currently connected to {{length}} media server(s).",
+        "header": "esmBot Media Statistics",
         "runningJobs": "Running Jobs: {{count}}",
         "server": "Server {{num}}"
       },
@@ -979,6 +990,7 @@
       "ephemeral": "ephemeral",
       "image": "image",
       "link": "link",
+      "media": "media",
       "spoiler": "spoiler",
       "text": "text",
       "togif": "togif"
@@ -987,19 +999,20 @@
       "ephemeral": "Attempt to send output as an ephemeral/temporary response",
       "image": "An image/GIF attachment",
       "link": "An image/GIF URL",
+      "media": "A media attachment",
       "spoiler": "Attempt to send output as a spoiler",
       "text": "The text to put on the image",
       "togif": "Force GIF output"
     },
     "frames": "That GIF has way too many frames (over 1000)!",
-    "jobEnded": "Something happened to the image servers before I could receive the image. Try running your command again.",
-    "large": "That image is too large (>= 40MB)! Try using a smaller image.",
+    "jobEnded": "Something happened to the media servers before I could receive the output. Try running your command again.",
+    "large": "That file is too large (>= 40MB)! Try using a smaller file.",
     "nocmd": "That command isn't supported on this instance of esmBot.",
     "noanim": "That image isn't in an animated format (GIF or WEBP)!",
     "noImage": "You need to provide an image/GIF!",
-    "noResult": "I couldn't get a response from the image server. Please try again.",
-    "noServers": "I can't seem to contact the image servers, they might be down or still trying to start up. Please wait a little bit.",
-    "noTempServer": "The resulting image was larger than Discord's upload limit, so I can't upload it.",
+    "noResult": "I couldn't get a response from the media server. Please try again.",
+    "noServers": "I can't seem to contact the media servers, they might be down or still trying to start up. Please wait a little bit.",
+    "noTempServer": "The resulting file was larger than Discord's upload limit, so I can't upload it.",
     "noParam": "You need to provide some text!",
     "notWorking": "I couldn't find a way to process this image; this likely means that I haven't been set up correctly. Please contact the bot owner.",
     "processing": "Processing... This might take a while",
@@ -1007,15 +1020,15 @@
     "selected": "The image has been selected for your next command.",
     "slowDown": "Please slow down a bit.",
     "tempImageSent": "Here's your image!",
-    "tempSite": "The result image was larger than Discord's upload limit, so it was uploaded to an external site instead.",
+    "tempSite": "The result was larger than Discord's upload limit, so it was uploaded to an external site instead.",
     "tenor": "I've been rate-limited by Tenor. Please try uploading your GIF elsewhere.",
     "timeout": "The request to get that image timed out. Please try again, upload your image elsewhere, or use another image.",
     "timeoutDownload": "The request timed out before I could download that image. Try uploading your image somewhere else or reducing its size.",
     "tip": "(Tip: try right-clicking/holding on a message and press Apps -> Select Image, then try again.)",
     "tooLarge": "The resulting file was too large to upload. Try again with a smaller image if possible.",
     "tooLong": "The image is taking too long to process (>=10 minutes), so the job was cancelled. Try using a smaller image.",
-    "tryAgain": "This image job couldn't be completed because the server it was running on went down. Try running your command again.",
-    "unknown": "The image output wasn't in a recognizable format. Please try again."
+    "tryAgain": "This job couldn't be completed because the server it was running on went down. Try running your command again.",
+    "unknown": "The output wasn't in a recognizable format. Please try again."
   },
   "managedBy": "This instance is managed by **{{owner}}**",
   "noDatabase": "This command is unavailable on stateless instances of esmBot.",

@@ -1,6 +1,6 @@
 {
   "name": "esmbot",
-  "version": "2025.9.0",
+  "version": "2025.12.0",
   "description": "A Discord bot with miscellaneous features",
   "exports": "./dist/app.js",
   "bin": "./dist/app.js",
@@ -46,43 +46,43 @@
   },
   "dependencies": {
     "@db/sqlite": "jsr:^0.12.0",
-    "better-sqlite3": "^12.4.1",
+    "better-sqlite3": "^12.5.0",
     "bufferutil": "^4.0.9",
     "dotenv": "^17.2.3",
-    "file-type": "^21.0.0",
+    "file-type": "^21.1.1",
     "format-duration": "^3.0.2",
-    "ipaddr.js": "^2.2.0",
+    "ipaddr.js": "^2.3.0",
     "node-addon-api": "^8.5.0",
-    "oceanic.js": "1.12.0",
+    "oceanic.js": "1.13.0",
     "postgres": "^3.4.7",
-    "shoukaku": "^4.1.1",
+    "shoukaku": "^4.2.0",
     "winston": "^3.18.3",
     "winston-daily-rotate-file": "^5.0.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {
-    "@eslint/compat": "^1.4.0",
-    "@eslint/js": "^9.37.0",
+    "@eslint/compat": "^2.0.0",
+    "@eslint/js": "^9.39.1",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/bun": "^1.2.23",
-    "@types/node": "^22.18.8",
+    "@types/bun": "^1.3.3",
+    "@types/node": "^22.19.1",
     "@types/ws": "^8.18.1",
-    "cmake-js": "^7.3.1",
-    "eslint": "^9.37.0",
+    "cmake-js": "^7.4.0",
+    "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import-x": "^4.16.1",
     "eslint-plugin-prettier": "^5.5.4",
-    "globals": "^16.4.0",
-    "prettier": "^3.6.2",
+    "globals": "^16.5.0",
+    "prettier": "^3.7.4",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.0"
+    "typescript-eslint": "^8.48.1"
   },
   "optionalDependencies": {
-    "@sentry/bun": "^10.19.0",
-    "@sentry/deno": "^10.19.0",
-    "@sentry/node": "^10.19.0",
-    "pm2": "^6.0.13"
+    "@sentry/bun": "^10.29.0",
+    "@sentry/deno": "^10.29.0",
+    "@sentry/node": "^10.29.0",
+    "pm2": "^6.0.14"
   },
   "binary": {
     "napi_versions": [
@@ -112,9 +112,6 @@
     "onlyBuiltDependencies": [
       "better-sqlite3",
       "bufferutil"
-    ],
-    "patchedDependencies": {
-      "pm2": "patches/pm2.patch"
-    }
+    ]
   }
 }

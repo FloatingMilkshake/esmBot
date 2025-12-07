@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import process from "node:process";
 import type { AnyInteractionGateway } from "oceanic.js";
 import Command from "#cmd-classes/command.js";
-import ImageCommand from "#cmd-classes/imageCommand.js";
+import MediaCommand from "#cmd-classes/mediaCommand.js";
 import { collectors, commands, messageCommands, selectedImages, userCommands } from "#utils/collections.js";
 import detectRuntime from "#utils/detectRuntime.js";
 import { getString } from "#utils/i18n.js";
@@ -24,9 +24,8 @@ export default async ({ client, database }: EventParams, interaction: AnyInterac
   if (!client.ready) return;
 
   // handle incoming non-command interactions
-  if (interaction.isComponentInteraction()) {
-    //await interaction.deferUpdate();
-    const collector = collectors.get(interaction.message.id);
+  if (interaction.isComponentInteraction() || interaction.isModalSubmitInteraction()) {
+    const collector = collectors.get(interaction.message!.id);
     if (collector) collector.emit("interaction", interaction);
     return;
   }
@@ -74,7 +73,7 @@ export default async ({ client, database }: EventParams, interaction: AnyInterac
         flags: commandClass.success ? 0 : 64,
       });
     } else if (typeof result === "object") {
-      if (commandClass instanceof ImageCommand && result.files) {
+      if (commandClass instanceof MediaCommand && result.files) {
         const fileSize = interaction.attachmentSizeLimit;
         const file = result.files[0];
         if (file.contents.length > fileSize) {
@@ -163,7 +162,7 @@ export default async ({ client, database }: EventParams, interaction: AnyInterac
           content: `${getString("error", { locale: interaction.locale })} <https://github.com/esmBot/esmBot/issues>`,
           files: [
             {
-              contents: Buffer.from(clean(error)),
+              contents: Buffer.from(clean(error, [interaction.token])),
               name: "error.txt",
             },
           ],

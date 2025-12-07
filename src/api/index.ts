@@ -6,12 +6,14 @@ import process from "node:process";
 import { DiscordHTTPError, DiscordRESTError, type RawMessage } from "oceanic.js";
 import type WSocket from "ws";
 import { WebSocketServer, type ErrorEvent } from "ws";
-import run from "#utils/image-runner.js";
-import { img } from "#utils/imageLib.js";
 import logger from "#utils/logger.js";
-import type { ImageParams } from "#utils/types.js";
+import { media } from "#utils/mediaLib.js";
+import run from "#utils/mediaRunner.js";
+import type { MediaFormats, MediaParams } from "#utils/types.js";
 
-const formats = Object.keys(img.imageInit());
+const formats = media.init();
+
+const cacheTimeout = 15 * 60 * 1000; // jobs are deleted 15 minutes after completion if not fetched
 
 const Rerror = 0x01;
 const Tqueue = 0x02;
@@ -38,7 +40,7 @@ interface VerifyEvents {
 
 interface Job {
   num: number;
-  msg: ImageParams;
+  msg: MediaParams;
   verifyEvent: EventEmitter<VerifyEvents>;
   tag?: Buffer;
   error?: string;
@@ -48,33 +50,34 @@ interface Job {
 
 interface MiniJob {
   id: bigint;
-  msg: ImageParams;
+  msg: MediaParams;
   num: number;
 }
 
-class JobCache<K, V extends Job> extends Map {
-  set(key: K, value: V) {
-    super.set(key, value);
-    setTimeout(() => {
-      if (super.has(key) && this.get(key) === value && value.data) super.delete(key);
-    }, 900000); // delete jobs if not requested after 15 minutes
-    return this;
-  }
+class JobCache<K, V> extends Map<K, V> {
+  private delListener: ((size: number) => void) | undefined;
+  private timeouts: Map<K, ReturnType<typeof setTimeout>> = new Map();
 
-  _delListener(_size: number) {}
+  markFinished(key: K) {
+    const handle = setTimeout(() => {
+      this.delete(key);
+    }, cacheTimeout);
+    this.timeouts.set(key, handle);
+  }
 
   delete(key: K) {
     const out = super.delete(key);
-    this._delListener(this.size);
+    this.delListener?.(this.size);
+    const handle = this.timeouts.get(key);
+    if (handle) {
+      clearTimeout(handle);
+      this.timeouts.delete(key);
+    }
     return out;
   }
 
   delListen(func: (size: number) => void) {
-    this._delListener = func;
-  }
-
-  get(key: K): V {
-    return super.get(key);
+    this.delListener = func;
   }
 }
 
@@ -83,16 +86,16 @@ const jobs = new JobCache<bigint, Job>();
 
 const PASS = process.env.PASS ? process.env.PASS : undefined;
 
-// Used for direct image uploads
+// Used for direct media uploads
 const clientID = process.env.CLIENT_ID;
 const discordBaseURL =
   process.env.REST_PROXY && process.env.REST_PROXY !== "" ? process.env.REST_PROXY : "https://discord.com/api/v10";
 
 /**
- * Accept an image job.
+ * Accept a media job.
  */
 async function acceptJob(id: bigint, sock: WSocket): Promise<void> {
-  const job = jobs.get(id);
+  const job = jobs.get(id)!;
   try {
     await runJob(
       {
@@ -106,7 +109,7 @@ async function acceptJob(id: bigint, sock: WSocket): Promise<void> {
   } catch (err) {
     if (!(err instanceof Error)) return;
     error(`Error on job ${id}: ${err}`, job.num);
-    const newJob = jobs.get(id);
+    const newJob = jobs.get(id)!;
     if (!newJob.tag) {
       newJob.error = err.message;
       jobs.set(id, newJob);
@@ -118,9 +121,9 @@ async function acceptJob(id: bigint, sock: WSocket): Promise<void> {
 
   // Because malloc_trim can sometimes take longer than expected,
   // we wait until all* jobs are finished before trimming to avoid potential issues.
-  // See the comment in natives/node/image.cc for more info
+  // See the comment in natives/node/media.cc for more info
   if (jobs.size <= 1) {
-    img.trim();
+    media.trim();
   }
 }
 
@@ -138,9 +141,12 @@ wss.on("connection", (ws, request) => {
   ws.binaryType = "nodebuffer";
   const cur = Buffer.alloc(2);
   cur.writeUInt16LE(jobs.size);
-  const cmdFormats: { [cmd: string]: string[] } = {};
-  for (const cmd of img.funcs) {
-    cmdFormats[cmd] = formats;
+  const cmdFormats: MediaFormats = {};
+  if (media.funcs.image && formats.image) {
+    cmdFormats.image = {};
+    for (const cmd of media.funcs.image) {
+      cmdFormats.image[cmd] = formats.image;
+    }
   }
   const init = Buffer.concat([
     Buffer.from([Rinit]),
@@ -222,7 +228,7 @@ httpServer.on("request", (req, res) => {
     return res.end("400 Bad Request");
   }
   const reqUrl = new URL(req.url, `http://${req.headers.host}`);
-  if (reqUrl.pathname === "/image" && req.method === "GET") {
+  if (reqUrl.pathname === "/media" && req.method === "GET") {
     const param = reqUrl.searchParams.get("id");
     if (!param) {
       res.statusCode = 400;
@@ -233,10 +239,10 @@ httpServer.on("request", (req, res) => {
       res.statusCode = 404;
       return res.end("404 Not Found");
     }
-    log(`Sending image data for job ${id} to ${req.socket.remoteAddress}:${req.socket.remotePort} via HTTP`);
-    const ext = jobs.get(id).ext;
+    log(`Sending media data for job ${id} to ${req.socket.remoteAddress}:${req.socket.remotePort} via HTTP`);
+    const job = jobs.get(id)!;
     let contentType: string | undefined;
-    switch (ext) {
+    switch (job.ext) {
       case "gif":
         contentType = "image/gif";
         break;
@@ -255,10 +261,9 @@ httpServer.on("request", (req, res) => {
         break;
     }
     if (contentType) res.setHeader("Content-Type", contentType);
-    else res.setHeader("Content-Type", ext ?? "application/octet-stream");
-    const data = jobs.get(id).data;
+    else res.setHeader("Content-Type", job.ext ?? "application/octet-stream");
     jobs.delete(id);
-    return res.end(data);
+    return res.end(job.data);
   }
   if (reqUrl.pathname === "/count" && req.method === "GET") {
     log(`Sending job count to ${req.socket.remoteAddress}:${req.socket.remotePort} via HTTP`);
@@ -347,11 +352,11 @@ const fileSize = 10485760;
 async function finishJob(
   data: { buffer: Buffer; fileExtension: string },
   job: MiniJob,
-  object: ImageParams,
+  object: MediaParams,
   ws: WSocket,
 ) {
   log(`Sending result of job ${job.id}`, job.num);
-  const jobObject = jobs.get(job.id);
+  const jobObject = jobs.get(job.id)!;
   jobObject.data = data.buffer;
   jobObject.ext = data.fileExtension;
   let tag: Buffer;
@@ -366,6 +371,7 @@ async function finishJob(
   }
 
   jobs.set(job.id, jobObject);
+  jobs.markFinished(job.id);
   let r: RawMessage | undefined;
   if (clientID && object.token && allowedExtensions.includes(jobObject.ext) && jobObject.data.length < fileSize) {
     const form = new FormData();
@@ -416,15 +422,21 @@ async function finishJob(
 }
 
 /**
- * Run an image job.
+ * Run a media job.
  */
 async function runJob(job: MiniJob, ws: WSocket): Promise<void> {
   log(`Job ${job.id} starting...`, job.num);
 
   const object = job.msg;
-  // If the image has a path, it must also have a type
+
+  // Any other job type is invalid
+  if (object.type !== "image") {
+    throw new TypeError("Unknown job type");
+  }
+
+  // If the input has a path, it must also have a type
   if (object.path && !object.input?.type) {
-    throw new TypeError("Unknown image type");
+    throw new TypeError("Unknown media type");
   }
 
   log(`Job ${job.id} started`, job.num);

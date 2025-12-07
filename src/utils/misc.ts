@@ -8,7 +8,7 @@ import commandsConfig from "#config/commands.json" with { type: "json" };
 import messagesConfig from "#config/messages.json" with { type: "json" };
 
 import type { DatabasePlugin } from "../database.ts";
-import { disconnect, servers } from "./image.ts";
+import { disconnect, servers } from "./media.ts";
 
 const pm2 = process.env.PM2_USAGE ? (await import("pm2")).default : null;
 
@@ -24,9 +24,13 @@ const optionalReplace = (token: string) => {
 };
 
 // clean(text) to clean message of any private info or mentions
-export function clean(input: string | Error, skipEnv = false) {
+export function clean(input: string | Error, remove: string[] = [], skipEnv = false) {
   let text = input;
   if (typeof text !== "string") text = util.inspect(text, { depth: 1 });
+
+  for (const entry of remove) {
+    text = text.replaceAll(entry, optionalReplace(entry));
+  }
 
   text = text.replaceAll("`", `\`${String.fromCharCode(8203)}`).replaceAll("@", `@${String.fromCharCode(8203)}`);
 

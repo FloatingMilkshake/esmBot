@@ -187,6 +187,9 @@
       "freeze": {
         "endframe": "endframe"
       },
+      "globe": {
+        "snow": "snow"
+      },
       "hue": {
         "shift": "shift"
       },
@@ -405,6 +408,9 @@
       },
       "freeze": {
         "endframe": "Set the end frame (default: last frame)"
+      },
+      "globe": {
+        "snow": "Turns the globe into a snow globe"
       },
       "hue": {
         "shift": "Set the amount to shift by"
@@ -914,7 +920,6 @@
       },
       "stats": {
         "botUptime": "Bot Uptime",
-        "bunVersion": "Bun Version",
         "connectionUptime": "Connection Uptime",
         "denoVersion": "Deno Version",
         "header": "esmBot Statistics",
@@ -1078,6 +1083,7 @@
     "waitingForSomeone": "Waiting 10 seconds for someone to return...",
     "yes": "Yes"
   },
+  "support": "Join esmBot Support",
   "timeFormat": "{{days}} days, {{hours}} hrs, {{minutes}} mins, {{seconds}} secs",
   "tooLarge": "The result was too large, so here it is as a file:"
 }

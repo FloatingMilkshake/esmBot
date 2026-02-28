@@ -1,4 +1,3 @@
-// eslint-disable-next-line import-x/order
 import process from "node:process";
 
 const [major] = process.versions.node.split(".").map(Number);
@@ -134,7 +133,7 @@ logger.log("info", "Finished loading locale data.");
 logger.log("info", "Attempting to load commands...");
 for await (const commandFile of glob(resolve(basePath, "..", "commands", "*", runtime.tsLoad ? "*.{js,ts}" : "*.js"))) {
   try {
-    await load(null, commandFile);
+    await load(commandFile);
   } catch (e) {
     logger.error(`Failed to register command from ${commandFile}: ${e}`);
   }
@@ -218,7 +217,7 @@ if (process.env.PM2_USAGE) {
         switch (packet.data?.type) {
           case "reload": {
             const cmdPath = paths.get(packet.data.message);
-            if (cmdPath) await load(client, cmdPath, true);
+            if (cmdPath) await load(cmdPath);
             break;
           }
           case "soundreload":
@@ -234,6 +233,7 @@ if (process.env.PM2_USAGE) {
             endBroadcast(client);
             break;
           case "eval":
+            // oxlint-disable-next-line no-eval
             eval(packet.data.message);
             break;
           case "serverCounts":

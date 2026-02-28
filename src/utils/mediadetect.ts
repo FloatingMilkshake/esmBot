@@ -1,9 +1,10 @@
 import process from "node:process";
 import {
-  AttachmentFlags,
   type Client,
   type CommandInteraction,
+  Constants,
   type Message,
+  type MessageComponent,
   type MessageSnapshotMessage,
   type Permission,
   PrivateChannel,
@@ -26,10 +27,11 @@ const giphyMediaURLs = [
   "media3.giphy.com",
   "media4.giphy.com",
 ];
+const klipyURLs = ["klipy.com"];
 
-const combined = [...tenorURLs, ...giphyURLs, ...giphyMediaURLs];
+const combined = [...tenorURLs, ...giphyURLs, ...giphyMediaURLs, ...klipyURLs];
 
-const providerUrls = ["https://tenor.co", "https://giphy.com"];
+const providerUrls = ["https://tenor.co", "https://tenor.com", "https://giphy.com", "https://klipy.com"];
 
 type TenorMediaObject = {
   url: string;
@@ -49,6 +51,46 @@ type TenorResponse = {
   }[];
 };
 
+type KlipyMediaObject = {
+  url: string;
+  width: number;
+  height: number;
+  size: number;
+};
+
+type KlipyMediaTypes = {
+  gif: KlipyMediaObject;
+  webp: KlipyMediaObject;
+  jpg: KlipyMediaObject;
+  mp4: KlipyMediaObject;
+  webm: KlipyMediaObject;
+};
+
+type KlipyMediaResult = {
+  id: number;
+  slug: string;
+  title: string;
+  file: {
+    hd: KlipyMediaTypes;
+    md: KlipyMediaTypes;
+    sm: KlipyMediaTypes;
+    xs: KlipyMediaTypes;
+  };
+  tags: string[];
+  type: string;
+  blur_preview: string;
+};
+
+type KlipyResponse = {
+  result: boolean;
+  errors?: {
+    message: string[];
+  };
+  data: {
+    data: KlipyMediaResult[];
+  };
+};
+
 export type MediaMeta = {
   path: string;
   type?: string;
@@ -65,6 +107,7 @@ async function getMedia(
   media: string,
   media2: string,
   mediaType: MediaParams["type"][],
+  single = false,
   spoiler = false,
   extraReturnTypes = false,
   type: string | null = null,
@@ -93,16 +136,17 @@ async function getMedia(
     name: fileNameNoExtension,
     spoiler,
   };
-  const host = new URL(media2).host;
+  const url2 = new URL(media2);
+  const host = url2.host;
   if (mediaType.includes("image") && combined.includes(host)) {
     if (tenorURLs.includes(host)) {
-      // Tenor doesn't let us access a raw GIF without going through their API,
+      // Tenor's API tends to be the most reliable way to get a raw GIF,
       // so we use that if there's a key in the config
-      if (process.env.TENOR !== "") {
+      if (process.env.TENOR && process.env.TENOR !== "") {
         let id: string | undefined;
-        if (media2.includes("tenor.com/view/")) {
+        if (url2.pathname.startsWith("/view/")) {
           id = media2.split("-").pop();
-        } else if (media2.endsWith(".gif")) {
+        } else if (url2.pathname.endsWith(".gif")) {
           const redirect = (await fetch(media2, { method: "HEAD", redirect: "manual" })).headers.get("location");
           id = redirect?.split("-").pop();
         } else {
@@ -122,9 +166,36 @@ async function getMedia(
         if (json.error) throw Error(json.error.message);
         if (json.results.length === 0) return;
         payload.path = json.results[0].media_formats.gif.url;
+      } else if (url2.pathname.startsWith("/view/")) {
+        const tenorURL = url2;
+        if (!tenorURL.pathname.endsWith(".gif")) tenorURL.pathname += ".gif";
+
+        const redirectReq = await fetch(tenorURL, { method: "HEAD", redirect: "manual" });
+        if (redirectReq.status !== 301 && redirectReq.status !== 302) return;
+
+        const redirect = redirectReq.headers.get("location");
+        if (!redirect) return;
+        payload.path = redirect;
       } else {
         return;
       }
+      payload.type = "image/gif";
+      payload.mediaType = "image";
+    } else if (klipyURLs.includes(host)) {
+      if (!process.env.KLIPY || process.env.KLIPY === "") return;
+      if (!media2.includes("klipy.com/gifs/")) return;
+      const id = url2.pathname.replace("/gifs/", "");
+      const data = await fetch(`https://api.klipy.com/api/v1/${process.env.KLIPY}/gifs/items?slugs=${id}`);
+      if (data.status === 429) {
+        if (extraReturnTypes) {
+          payload.type = "klipylimit";
+          return payload;
+        }
+      }
+      const json = (await data.json()) as KlipyResponse;
+      if (json.errors) throw AggregateError(json.errors.message);
+      if (json.data.data.length === 0) return;
+      payload.path = json.data.data[0].file.hd.gif.url;
       payload.type = "image/gif";
       payload.mediaType = "image";
     } else if (giphyURLs.includes(host)) {
@@ -166,6 +237,7 @@ async function getMedia(
     if (result.url) payload.path = result.url;
     payload.type = type ?? result.type;
     if (result.mediaType) payload.mediaType = result.mediaType;
+    if (payload.type === "large" && single) return payload;
     if (
       !payload.type ||
       !payload.mediaType ||
@@ -183,12 +255,18 @@ async function checkMedia(
   message: Message,
   extraReturnTypes: boolean,
   mediaType: MediaParams["type"][],
+  singleMessage = false,
 ): Promise<MediaMeta | undefined> {
   let type: MediaMeta | undefined;
 
   // first check the embeds
   if (message.embeds.length !== 0) {
-    type = await checkEmbeds(message, extraReturnTypes, mediaType);
+    type = await checkEmbeds(message, extraReturnTypes, mediaType, singleMessage);
+  }
+
+  // then check the components
+  if (message.components.length !== 0) {
+    type = await checkComponents(message.components, extraReturnTypes, mediaType, singleMessage);
   }
 
   // then check the attachments
@@ -199,21 +277,25 @@ async function checkMedia(
         firstAttachment.proxyURL,
         firstAttachment.url,
         mediaType,
-        !!(firstAttachment.flags & AttachmentFlags.IS_SPOILER),
+        singleMessage,
+        !!(firstAttachment.flags & Constants.AttachmentFlags.IS_SPOILER),
       );
   }
 
-  // then check embeds and attachments inside forwards
+  // then check embeds, components, and attachments inside forwards
   if (!type && message.messageSnapshots?.[0]) {
     const forward = message.messageSnapshots?.[0].message;
-    if (forward.embeds.length !== 0) type = await checkEmbeds(forward, extraReturnTypes, mediaType);
+    if (forward.embeds.length !== 0) type = await checkEmbeds(forward, extraReturnTypes, mediaType, singleMessage);
+    if (forward.components.length !== 0)
+      type = await checkComponents(forward.components, extraReturnTypes, mediaType, singleMessage);
 
     if (!type && forward.attachments.length !== 0) {
       type = await getMedia(
         forward.attachments[0].proxyURL,
         forward.attachments[0].url,
         mediaType,
-        !!(forward.attachments[0].flags & AttachmentFlags.IS_SPOILER),
+        singleMessage,
+        !!(forward.attachments[0].flags & Constants.AttachmentFlags.IS_SPOILER),
       );
     }
   }
@@ -222,10 +304,57 @@ async function checkMedia(
   return type;
 }
 
+function checkComponents(
+  components: MessageComponent[],
+  extraReturnTypes: boolean,
+  mediaType: MediaParams["type"][],
+  singleMessage = false,
+) {
+  for (const component of components) {
+    // full-size image/video
+    if (component.type === Constants.ComponentTypes.MEDIA_GALLERY) {
+      return getMedia(
+        component.items[0].media.proxyURL ?? component.items[0].media.url,
+        component.items[0].media.url,
+        mediaType,
+        singleMessage,
+        component.items[0].spoiler,
+        extraReturnTypes,
+      );
+    }
+    // section thumbnail
+    if (
+      component.type === Constants.ComponentTypes.SECTION &&
+      component.accessory.type === Constants.ComponentTypes.THUMBNAIL
+    ) {
+      return getMedia(
+        component.accessory.media.proxyURL ?? component.accessory.media.url,
+        component.accessory.media.url,
+        mediaType,
+        singleMessage,
+        component.accessory.spoiler,
+        extraReturnTypes,
+      );
+    }
+    // raw file
+    if (component.type === Constants.ComponentTypes.FILE) {
+      return getMedia(
+        component.file.proxyURL ?? component.file.url,
+        component.file.url,
+        mediaType,
+        singleMessage,
+        component.spoiler,
+        extraReturnTypes,
+      );
+    }
+  }
+}
+
 function checkEmbeds(
   message: Message | MessageSnapshotMessage,
   extraReturnTypes: boolean,
   mediaType: MediaParams["type"][],
+  singleMessage = false,
 ) {
   let hasSpoiler = false;
   if (message.embeds[0].url && message.content) {
@@ -239,13 +368,21 @@ function checkEmbeds(
     message.embeds[0].video?.url &&
     message.embeds[0].url
   ) {
-    return getMedia(message.embeds[0].video.url, message.embeds[0].url, mediaType, hasSpoiler, extraReturnTypes);
+    return getMedia(
+      message.embeds[0].video.url,
+      message.embeds[0].url,
+      mediaType,
+      singleMessage,
+      hasSpoiler,
+      extraReturnTypes,
+    );
     // then thumbnails
   } else if (message.embeds[0].thumbnail) {
     return getMedia(
       message.embeds[0].thumbnail.proxyURL ?? message.embeds[0].thumbnail.url,
       message.embeds[0].thumbnail.url,
       mediaType,
+      singleMessage,
       hasSpoiler,
       extraReturnTypes,
     );
@@ -255,6 +392,7 @@ function checkEmbeds(
       message.embeds[0].image.proxyURL ?? message.embeds[0].image.url,
       message.embeds[0].image.url,
       mediaType,
+      singleMessage,
       hasSpoiler,
       extraReturnTypes,
     );
@@ -336,13 +474,14 @@ export default async (
         attachment.proxyURL,
         attachment.url,
         mediaType,
-        !!(attachment.flags & AttachmentFlags.IS_SPOILER),
+        true,
+        !!(attachment.flags & Constants.AttachmentFlags.IS_SPOILER),
         !!attachment.contentType,
       );
     }
     const link = interaction.data.options.getString("link");
     if (link) {
-      return getMedia(link, link, mediaType, false, extraReturnTypes, null, interaction.client);
+      return getMedia(link, link, mediaType, true, false, extraReturnTypes, null, interaction.client);
     }
   }
   if (cmdMessage) {
@@ -357,7 +496,7 @@ export default async (
       }
     }
     // then we check the current message
-    const result = await checkMedia(cmdMessage, extraReturnTypes, mediaType);
+    const result = await checkMedia(cmdMessage, extraReturnTypes, mediaType, singleMessage);
     if (result) return result;
   }
   if (!singleMessage && (cmdMessage || interaction?.authorizingIntegrationOwners?.[0] !== undefined)) {

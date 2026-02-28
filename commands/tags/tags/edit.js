@@ -1,4 +1,3 @@
-import { Constants } from "oceanic.js";
 import Command from "#cmd-classes/command.js";
 
 class TagsEditCommand extends Command {
@@ -24,7 +23,7 @@ class TagsEditCommand extends Command {
           : this.args.slice(2).join(" "),
         author: this.author.id,
       },
-      this.guild,
+      this.guild.id,
     );
     this.success = true;
     return this.getString("commands.responses.tags.edited", {
@@ -37,14 +36,14 @@ class TagsEditCommand extends Command {
   static flags = [
     {
       name: "name",
-      type: Constants.ApplicationCommandOptionTypes.STRING,
+      type: "string",
       description: "The name of the tag",
       required: true,
       classic: true,
     },
     {
       name: "content",
-      type: Constants.ApplicationCommandOptionTypes.STRING,
+      type: "string",
       description: "The content of the tag",
       required: true,
       classic: true,

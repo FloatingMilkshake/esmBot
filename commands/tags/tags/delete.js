@@ -1,4 +1,3 @@
-import { Constants } from "oceanic.js";
 import Command from "#cmd-classes/command.js";
 
 class TagsDeleteCommand extends Command {
@@ -17,7 +16,7 @@ class TagsDeleteCommand extends Command {
       !owners?.includes(this.author.id)
     )
       return this.getString("commands.responses.tags.notOwner");
-    await this.database.removeTag(tagName, this.guild);
+    await this.database.removeTag(tagName, this.guild.id);
     this.success = true;
     return this.getString("commands.responses.tags.deleted", {
       params: {
@@ -29,7 +28,7 @@ class TagsDeleteCommand extends Command {
   static flags = [
     {
       name: "name",
-      type: Constants.ApplicationCommandOptionTypes.STRING,
+      type: "string",
       description: "The name of the tag",
       required: true,
       classic: true,

@@ -1,4 +1,3 @@
-import { Constants } from "oceanic.js";
 import Command from "#cmd-classes/command.js";
 
 const blacklist = ["create", "add", "edit", "remove", "delete", "list", "random", "own", "owner"];
@@ -30,7 +29,7 @@ class TagsAddCommand extends Command {
           : this.args.slice(1).join(" "),
         author: this.author.id,
       },
-      this.guild,
+      this.guild.id,
     );
     this.success = true;
     return this.getString("commands.responses.tags.added", {
@@ -43,14 +42,14 @@ class TagsAddCommand extends Command {
   static flags = [
     {
       name: "name",
-      type: Constants.ApplicationCommandOptionTypes.STRING,
+      type: "string",
       description: "The name of the tag",
       required: true,
       classic: true,
     },
     {
       name: "content",
-      type: Constants.ApplicationCommandOptionTypes.STRING,
+      type: "string",
       description: "The content of the tag",
       required: true,
       classic: true,

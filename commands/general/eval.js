@@ -1,6 +1,5 @@
 import { Buffer } from "node:buffer";
 import process from "node:process";
-import { Constants } from "oceanic.js";
 import Command from "#cmd-classes/command.js";
 import { clean } from "#utils/misc.js";
 
@@ -14,6 +13,7 @@ class EvalCommand extends Command {
     await this.acknowledge();
     const code = this.getOptionString("code") ?? this.args.join(" ");
     try {
+      // oxlint-disable-next-line no-eval
       let evaled = eval(code);
       if (process.env.PM2_USAGE && this.getOptionBoolean("broadcast")) {
         process.send?.({
@@ -48,14 +48,14 @@ class EvalCommand extends Command {
   static flags = [
     {
       name: "code",
-      type: Constants.ApplicationCommandOptionTypes.STRING,
+      type: "string",
       description: "The code to execute",
       classic: true,
       required: true,
     },
     {
       name: "broadcast",
-      type: Constants.ApplicationCommandOptionTypes.BOOLEAN,
+      type: "boolean",
       description: "Execute on all bot processes (only use if you know what you're doing!)",
     },
   ];

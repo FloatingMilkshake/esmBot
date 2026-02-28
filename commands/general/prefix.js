@@ -1,5 +1,4 @@
 import process from "node:process";
-import { Constants } from "oceanic.js";
 import Command from "#cmd-classes/command.js";
 
 class PrefixCommand extends Command {
@@ -20,7 +19,7 @@ class PrefixCommand extends Command {
         this.success = false;
         return this.getString("commands.responses.prefix.adminOnly");
       }
-      await this.database.setPrefix(this.args[0], this.guild);
+      await this.database.setPrefix(this.args[0], this.guild.id);
       return this.getString("commands.responses.prefix.changed", {
         params: {
           prefix: this.args[0],
@@ -39,7 +38,7 @@ class PrefixCommand extends Command {
   static flags = [
     {
       name: "prefix",
-      type: Constants.ApplicationCommandOptionTypes.STRING,
+      type: "string",
       description: "The server prefix you want to use",
       classic: true,
     },

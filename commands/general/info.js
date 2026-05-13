@@ -49,7 +49,7 @@ class InfoCommand extends Command {
             },
             {
               name: `💻 ${this.getString("commands.responses.info.sourceCode")}`,
-              value: `[${this.getString("commands.responses.info.clickHere")}](https://github.com/esmBot/esmBot)`,
+              value: `[${this.getString("commands.responses.info.clickHere")}](https://github.com/FloatingMilkshake/esmBot)`,
             },
             {
               name: `🌐 ${this.getString("commands.responses.info.translate")}`,

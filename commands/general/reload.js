@@ -17,8 +17,8 @@ class ReloadCommand extends Command {
     if (!skipSend) {
       await send(this.client);
     }
-    if (result !== commandName) return this.getString("commands.responses.reload.reloadFailed");
-    if (process.env.PM2_USAGE) {
+    if (result?.name !== commandName) return this.getString("commands.responses.reload.reloadFailed");
+    if (process.env.CLUSTER_TYPE) {
       process.send?.({
         type: "process:msg",
         data: {

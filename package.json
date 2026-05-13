@@ -1,6 +1,6 @@
 {
   "name": "esmbot",
-  "version": "2025.12.1",
+  "version": "2026.5.0",
   "description": "A Discord bot with miscellaneous features",
   "license": "MIT",
   "author": "Essem <essem@essem.space>",
@@ -59,33 +59,32 @@
   },
   "dependencies": {
     "@db/sqlite": "jsr:^0.12.0",
-    "better-sqlite3": "^12.6.2",
+    "better-sqlite3": "^12.9.0",
     "bufferutil": "^4.1.0",
-    "dotenv": "^17.3.1",
-    "file-type": "^21.3.0",
+    "dotenv": "^17.4.2",
+    "file-type": "^22.0.1",
     "format-duration": "^3.0.2",
-    "ipaddr.js": "^2.3.0",
-    "node-addon-api": "^8.5.0",
-    "oceanic.js": "1.13.1-dev.dc8fc61",
-    "postgres": "^3.4.7",
-    "shoukaku": "^4.2.0",
+    "ipaddr.js": "^2.4.0",
+    "node-addon-api": "^8.7.0",
+    "oceanic.js": "1.14.0",
+    "postgres": "^3.4.9",
+    "shoukaku": "^4.3.0",
     "winston": "^3.19.0",
-    "winston-daily-rotate-file": "^5.0.0",
-    "ws": "^8.19.0"
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^22.19.7",
+    "@types/node": "22",
     "@types/ws": "^8.18.1",
     "cmake-js": "^8.0.0",
-    "oxfmt": "^0.35.0",
-    "oxlint": "^1.50.0",
-    "typescript": "^5.9.3"
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.62.0",
+    "typescript": "^6.0.3"
   },
   "optionalDependencies": {
-    "@sentry/deno": "^10.40.0",
-    "@sentry/node": "^10.40.0",
-    "pm2": "^6.0.14"
+    "@sentry/deno": "^10.52.0",
+    "@sentry/node-core": "^10.52.0",
+    "pm2": "^7.0.1"
   },
   "engines": {
     "node": ">=22"

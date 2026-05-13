@@ -29,13 +29,15 @@ export interface CommandsConfig {
   blacklist: string[];
 }
 
-type ValueOrNested<T> = T | { [x: string]: ValueOrNested<T> };
-
-export type CommandEntry = Record<string, ValueOrNested<typeof Command>>;
+export type ExtCommand = {
+  baseCommand: boolean;
+  category: string;
+  params: Param[];
+  type: Constants.ApplicationCommandTypes;
+} & typeof Command;
 
 export type CommandType = "classic" | "application";
 export type CommandFlagType =
-  | "subcommand"
   | "string"
   | "integer"
   | "boolean"
@@ -55,10 +57,6 @@ export type ExtendedConstructedCommandOptions = {
   classic?: boolean;
 } & Omit<CombinedApplicationCommandOption, "type">;
 
-export type ConstructedCommandInfo = {
-  flags: ExtendedConstructedCommandOptions[];
-} & Omit<CommandInfo, "flags">;
-
 export type Param =
   | {
       name: string;
@@ -67,44 +65,29 @@ export type Param =
     }
   | string;
 
-export interface CommandInfo {
-  category: string;
-  description: string;
-  aliases: string[];
-  params: Param[];
-  flags: ExtendedCommandOptions[];
-  slashAllowed: boolean;
-  directAllowed: boolean;
-  userAllowed: boolean;
-  baseCommand: boolean;
-  adminOnly: boolean;
-  type: Constants.ApplicationCommandTypes;
-}
+export type MediaTypes = "image";
 
 export interface MediaParams {
   cmd: string;
-  type: "image";
   params: {
     [key: string]: string | number | boolean;
   };
-  input?: {
-    data?: ArrayBuffer;
-    type?: string;
-  };
   id: string;
-  path?: string;
-  url?: string;
-  name?: string;
-  onlyAnim?: boolean;
+  inputs: MediaMeta[];
   ephemeral?: boolean;
   spoiler?: boolean;
   token?: string;
 }
 
-export interface MediaTypeData {
-  url?: string;
-  type?: string;
-  mediaType?: MediaParams["type"];
+export interface MediaMeta {
+  path: string;
+  spoiler: boolean;
+}
+
+export interface JobOutput {
+  buffer: Buffer;
+  type: string;
+  spoiler: boolean;
 }
 
 export interface MediaFormats {
@@ -115,6 +98,10 @@ export interface MediaFormats {
 
 export interface MediaFuncs {
   image?: string[];
+}
+
+export interface MediaFuncTypes {
+  [cmd: string]: MediaTypes[];
 }
 
 export interface SearXNGResults {

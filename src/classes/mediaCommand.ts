@@ -12,20 +12,22 @@ import messages from "#config/messages.json" with { type: "json" };
 import { runningCommands, selectedImages } from "#utils/collections.js";
 import { convFlagType } from "#utils/handler.js";
 import { getAllLocalizations } from "#utils/i18n.js";
+import logger from "#utils/logger.js";
 import { runMediaJob } from "#utils/media.js";
-import mediaDetect, { type MediaMeta } from "#utils/mediadetect.js";
-import { clean, isEmpty, random } from "#utils/misc.js";
-import type { ExtendedConstructedCommandOptions, MediaParams } from "#utils/types.js";
+import mediaDetect from "#utils/mediadetect.js";
+import { clean, isEmpty, maxFileSize, random } from "#utils/misc.js";
+import { upload } from "#utils/tempimages.js";
+import type { ExtendedConstructedCommandOptions, MediaParams, MediaMeta, MediaTypes } from "#utils/types.js";
 import Command from "./command.ts";
 
 class MediaCommand extends Command {
   params?: object;
 
-  paramsFunc(_url?: string, _name?: string): object {
+  paramsFunc(): object {
     return {};
   }
 
-  async criteria(_text?: string | number | boolean | User | Attachment, _url?: string) {
+  async criteria(_text?: string | number | boolean | User | Attachment) {
     return true;
   }
 
@@ -51,68 +53,39 @@ class MediaCommand extends Command {
 
     const staticProps = this.constructor as typeof MediaCommand;
 
+    const ephemeral = this.getOptionBoolean("ephemeral");
+    const spoiler = this.getOptionBoolean("spoiler");
     let mediaParams: MediaParams;
 
-    let needsSpoiler = false;
     if (staticProps.requiresImage) {
       try {
         let selection: MediaMeta | undefined;
         if (!this.getOptionAttachment("image") && !this.getOptionString("link")) {
           selection = selectedImages.get(this.author.id);
         }
-        const image =
-          selection ??
-          (await mediaDetect(
-            this.client,
-            this.permissions,
-            staticProps.supportedTypes,
-            this.message,
-            this.interaction,
-            true,
-          ).catch((e) => {
-            if (e.name === "AbortError") {
-              runningCommands.delete(this.author.id);
-              return this.getString("image.timeout");
-            }
-            throw e;
-          }));
-        if (image === undefined) {
+        const media = selection
+          ? [selection]
+          : await mediaDetect(this.client, this.permissions, this.message, this.interaction).catch((e) => {
+              if (e.name === "AbortError") {
+                runningCommands.delete(this.author.id);
+                return this.getString("image.timeout");
+              }
+              throw e;
+            });
+        if (media.length === 0) {
           runningCommands.delete(this.author.id);
           return `${this.getString(`commands.noImage.${this.cmdName}`, { returnNull: true }) || this.getString("image.noImage", { returnNull: true }) || staticProps.noImage} ${this.getString("image.tip", { params: { name: this.client.user.globalName ?? this.client.user.username } })}`;
         }
-        if (typeof image === "string") return image;
+        if (typeof media === "string") return media;
         selectedImages.delete(this.author.id);
-        needsSpoiler = image.spoiler;
-        if (image.type === "large") {
-          runningCommands.delete(this.author.id);
-          return this.getString("image.large");
-        }
-        if (image.type === "tenorlimit") {
-          runningCommands.delete(this.author.id);
-          return this.getString("image.tenor");
-        }
-        if (image.type === "klipylimit") {
-          runningCommands.delete(this.author.id);
-          return this.getString("image.klipy");
-        }
-        if (image.type === "badurl") {
-          runningCommands.delete(this.author.id);
-          return this.getString("image.badurl");
-        }
         mediaParams = {
           cmd: staticProps.command,
-          type: image.mediaType ?? "image",
-          params: {
-            togif: !!this.getOptionBoolean("togif"),
-          },
-          input: {
-            type: image.type,
-          },
+          params: {},
           id: (this.interaction ?? this.message)?.id ?? Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(),
-          path: image.path,
-          url: image.url, // technically not required but can be useful for text filtering
-          name: image.name,
-          onlyAnim: !!staticProps.requiresAnim,
+          inputs: media,
+          ephemeral,
+          spoiler,
+          token: this.interaction?.token,
         };
       } catch (e) {
         runningCommands.delete(this.author.id);
@@ -121,16 +94,14 @@ class MediaCommand extends Command {
     } else {
       mediaParams = {
         cmd: staticProps.command,
-        type: "image",
-        params: {
-          togif: !!this.getOptionBoolean("togif"),
-        },
+        params: {},
+        inputs: [],
         id: (this.interaction ?? this.message)?.id ?? Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(),
+        ephemeral,
+        spoiler,
+        token: this.interaction?.token,
       };
     }
-
-    const spoiler = this.getOptionBoolean("spoiler");
-    if (spoiler != null) needsSpoiler = spoiler;
 
     if (staticProps.requiresParam) {
       const text =
@@ -140,7 +111,7 @@ class MediaCommand extends Command {
           staticProps.requiredParamType !== Constants.ApplicationCommandOptionTypes.STRING &&
             staticProps.requiredParamType !== "string",
         ) ?? this.args.join(" ").trim();
-      if (!text || (typeof text === "string" && isEmpty(text)) || !(await this.criteria(text, mediaParams.url))) {
+      if (!text || (typeof text === "string" && isEmpty(text)) || !(await this.criteria(text))) {
         runningCommands.delete(this.author?.id);
         return (
           this.getString(`commands.noParam.${this.cmdName}`, { returnNull: true }) ||
@@ -150,29 +121,16 @@ class MediaCommand extends Command {
       }
     }
 
-    if (this.params) {
-      Object.assign(mediaParams.params, this.params);
-    } else {
-      Object.assign(mediaParams.params, this.paramsFunc(mediaParams.url, mediaParams.name));
-    }
+    mediaParams.params = {
+      togif: !!this.getOptionBoolean("togif"),
+      ...(this.params ?? this.paramsFunc()),
+    };
 
     let status: Message | undefined;
-    if (
-      mediaParams.input &&
-      (mediaParams.input.type === "image/gif" || mediaParams.input.type === "image/webp") &&
-      this.message
-    ) {
+    if (this.message) {
       status = await this.processMessage(
         this.message.channel ?? (await this.client.rest.channels.get(this.message.channelID)),
       );
-    }
-
-    const ephemeral = this.getOptionBoolean("ephemeral");
-
-    if (this.interaction) {
-      mediaParams.ephemeral = ephemeral;
-      mediaParams.spoiler = needsSpoiler;
-      mediaParams.token = this.interaction.token;
     }
 
     try {
@@ -185,37 +143,56 @@ class MediaCommand extends Command {
           const path = new URL(attachment.proxy_url ?? attachment.proxyURL);
           path.searchParams.set("animated", "true");
           selectedImages.set(this.interaction.user.id, {
-            url: attachment.url,
             path: path.toString(),
-            name: attachment.filename,
-            type: attachment.content_type ?? attachment.contentType,
             spoiler: attachment.filename.startsWith("SPOILER_"),
           });
         }
         return;
       }
+      if (type === "large") return this.getString("image.large");
       if (type === "frames") return this.getString("image.frames");
       if (type === "unknown") return this.getString("image.unknown");
       if (type === "noresult") return this.getString("image.noResult");
       if (type === "ratelimit") return this.getString("image.ratelimit");
       if (type === "nocmd") return this.getString("image.nocmd");
-      if (type === "noanim" && staticProps.requiresAnim) return this.getString("image.noanim");
+      if (type === "noanim") return this.getString("image.noanim");
+      if (type === "nomedia")
+        return `${this.getString(`commands.noImage.${this.cmdName}`, { returnNull: true }) || this.getString("image.noImage", { returnNull: true }) || staticProps.noImage} ${this.getString("image.tip", { params: { name: this.client.user.globalName ?? this.client.user.username } })}`;
       if (type === "empty") return staticProps.empty;
+
       this.success = true;
-      if (type === "text")
+      const flags = ephemeral ? 64 : undefined;
+
+      if (type === "text") {
         return {
           content: `\`\`\`\n${clean(buffer.toString("utf8"), [], true)}\n\`\`\``,
-          flags: ephemeral ? 64 : undefined,
+          flags,
         };
-      return {
-        files: [
-          {
-            contents: buffer,
-            name: `${needsSpoiler ? "SPOILER_" : ""}${staticProps.command}.${type}`,
-          },
-        ],
-        flags: ephemeral ? 64 : undefined,
+      }
+
+      const file = {
+        contents: buffer,
+        name: `${spoiler || result.spoiler ? "SPOILER_" : ""}${staticProps.command}.${type}`,
       };
+      if (buffer.length > (this.interaction?.attachmentSizeLimit ?? maxFileSize(this.guild))) {
+        if (process.env.TEMPDIR && process.env.TEMPDIR !== "" && this.permissions.has("EMBED_LINKS")) {
+          if (this.interaction) {
+            await upload(this.client, { ...file, flags }, this.interaction);
+          } else if (this.message) {
+            await upload(this.client, { ...file, flags }, this.message);
+          }
+        } else {
+          return {
+            content: this.getString("image.noTempServer"),
+            flags: 64,
+          };
+        }
+      } else {
+        return {
+          files: [file],
+          flags,
+        };
+      }
     } catch (e) {
       const err = e as Error;
       if (err.toString().includes("media_not_working")) return this.getString("image.notWorking");
@@ -226,12 +203,21 @@ class MediaCommand extends Command {
       if (err.toString().includes("No available servers")) return this.getString("image.noServers");
       throw err;
     } finally {
-      try {
-        if (status) await status.delete();
-      } catch {
-        // no-op
-      }
+      if (status) await status.delete().catch((e) => logger.warn(`Failed to delete status message: ${e}`));
       runningCommands.delete(this.author?.id);
+    }
+  }
+
+  async finalize(res?: Message) {
+    if (!this.interaction || !res) return;
+    const attachment = res.attachments.first();
+    if (attachment) {
+      const path = new URL(attachment.proxyURL);
+      path.searchParams.set("animated", "true");
+      selectedImages.set(this.interaction.user.id, {
+        path: path.toString(),
+        spoiler: attachment.filename.startsWith("SPOILER_"),
+      });
     }
   }
 
@@ -315,14 +301,13 @@ class MediaCommand extends Command {
     "ubuntu",
   ];
 
-  static supportedTypes: MediaParams["type"][] = ["image"];
+  static supportedTypes: MediaTypes[] = ["image"];
 
   static requiresImage = true;
   static requiresParam = false;
   static requiredParam = "text";
   static requiredParamType: ExtendedConstructedCommandOptions["type"] = "string";
   static textOptional = false;
-  static requiresAnim = false;
   static alwaysGIF = false;
   static noImage = "You need to provide an image/GIF!";
   static noParam = "You need to provide some text!";

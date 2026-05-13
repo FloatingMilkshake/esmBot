@@ -20,7 +20,6 @@ To make managing environment variables easier, an example `.env` file is include
 These variables that are not necessarily required for the bot to run, but can greatly enhance its functionality:
 
 - `STAYVC`: Set this to true if you want the bot to stay in voice chat after playing music/a sound effect. You can make it leave by using the stop command.
-- `TENOR`: **This variable is deprecated.** An API token from [Tenor](https://tenor.com/gifapi). This can be useful for requesting Tenor GIFs a bit more reliably.
 - `KLIPY`: An API token from [KLIPY](https://klipy.com/docs). This is required for parsing share links from KLIPY.
 - `REST_PROXY`: A Discord REST URL to use besides the default (`https://discord.com/api/v{version_number}`). Can be useful for proxying requests to Discord through an external server.
 - `SENTRY_DSN`: A DSN endpoint URL from [Sentry](https://sentry.io). This is a fully optional integration for error monitoring and statistics.
@@ -28,7 +27,7 @@ These variables that are not necessarily required for the bot to run, but can gr
 - `TEMPDIR`: A directory that will store generated media files larger than Discord's filesize limit. It's recommended to set this to a directory being served by a web server.
 - `TMP_DOMAIN`: The root domain/directory that the media files larger than Discord's filesize limit are stored at. Example: `https://projectlounge.pw/tmp`
 - `THRESHOLD`: A filesize threshold that the bot will start deleting old files in `TEMPDIR` at.
-- `METRICS`: The HTTP port to serve [Prometheus](https://prometheus.io/)-compatible metrics on.
+- `CLUSTER_PORT`: The HTTP port to serve cluster management endpoints and [Prometheus](https://prometheus.io/)-compatible metrics on.
 - `API_TYPE`: Set this to "none" if you want to process all media locally. Alternatively, set it to "ws" to use a media API server specified in the `media` block of `config/servers.json`.
 - `ADMIN_SERVER`: A Discord server/guild ID to limit owner-only commands such as eval to.
 

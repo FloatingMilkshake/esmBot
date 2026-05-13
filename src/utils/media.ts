@@ -2,14 +2,14 @@ import { Buffer } from "node:buffer";
 import { lookup } from "node:dns/promises";
 import fs from "node:fs";
 import process from "node:process";
-import { fileTypeFromStream } from "file-type";
+import { fileTypeStream, type AnyWebReadableByteStreamWithFileType } from "file-type";
 import ipaddr from "ipaddr.js";
 import logger from "./logger.ts";
 import MediaConnection from "./mediaConnection.ts";
+import run from "./mediaRunner.ts";
 import { random } from "./misc.ts";
-import type { MediaParams, MediaTypeData } from "./types.ts";
+import type { MediaParams, MediaTypes } from "./types.ts";
 
-const run = process.env.API_TYPE === "ws" ? null : (await import("./mediaRunner.ts")).default;
 let mediaLib: import("./mediaLib.ts").MediaLib | undefined;
 
 interface ServerConfig {
@@ -23,7 +23,7 @@ export const formats = {
   image: ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"],
 };
 export const connections = new Map<string, MediaConnection>();
-export let servers: ServerConfig[];
+export let servers: ServerConfig[] = [];
 
 export async function initMediaLib() {
   const { media } = await import("./mediaLib.ts");
@@ -31,11 +31,48 @@ export async function initMediaLib() {
   mediaLib = media;
 }
 
-export async function getType(
+export async function request(
   media: URL,
-  extraReturnTypes: boolean,
-  typeMedia: MediaParams["type"][],
-): Promise<MediaTypeData | undefined> {
+  typeMedia: MediaTypes[],
+  typeOnly: true,
+): Promise<
+  | {
+      url: string;
+      type: string;
+      mediaType: MediaTypes;
+      ext: string;
+    }
+  | undefined
+>;
+export async function request(
+  media: URL,
+  typeMedia: MediaTypes[],
+  typeOnly: false,
+): Promise<
+  | {
+      buf: Buffer;
+      url: string;
+      type: string;
+      mediaType: MediaTypes;
+      ext: string;
+    }
+  | undefined
+>;
+export async function request(
+  media: URL,
+  typeMedia: MediaTypes[],
+  typeOnly = false,
+): Promise<
+  | {
+      buf?: Buffer;
+      url: string;
+      type: string;
+      mediaType: MediaTypes;
+      ext: string;
+    }
+  | undefined
+> {
+  // verify that IP address is valid
   try {
     const remoteIP = await lookup(media.host);
     const parsedIP = ipaddr.parse(remoteIP.address);
@@ -45,78 +82,102 @@ export async function getType(
     if ("code" in err && err.code === "ENOTFOUND") return;
     throw e;
   }
-  let type: string | undefined;
-  let mediaType: MediaParams["type"] | undefined;
+
   let url: string;
+  let stream: AnyWebReadableByteStreamWithFileType;
+
+  let size = 0;
+
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort();
-  }, 3000);
+  }, 15000);
   try {
-    const mediaRequest = await fetch(media, {
+    const res = await fetch(media, {
       signal: controller.signal,
-      method: "HEAD",
+      headers: {
+        "User-Agent": `Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com) esmBot/${process.env.ESMBOT_VER}`,
+      },
     });
     clearTimeout(timeout);
-    if (mediaRequest.redirected) {
-      const redirectHost = new URL(mediaRequest.url).host;
+    url = res.url;
+    if (res.status === 429) throw "ratelimit";
+
+    if (res.redirected) {
+      const redirectHost = new URL(res.url).host;
       const remoteIP = await lookup(redirectHost);
       const parsedIP = ipaddr.parse(remoteIP.address);
       if (parsedIP.range() !== "unicast") return;
     }
-    url = mediaRequest.url;
-    let size = 0;
-    if (mediaRequest.headers.has("content-range")) {
-      const contentRange = mediaRequest.headers.get("content-range");
+
+    if (res.headers.has("content-range")) {
+      const contentRange = res.headers.get("content-range");
       if (contentRange) size = Number.parseInt(contentRange.split("/")[1]);
-    } else if (mediaRequest.headers.has("content-length")) {
-      const contentLength = mediaRequest.headers.get("content-length");
+    } else if (res.headers.has("content-length")) {
+      const contentLength = res.headers.get("content-length");
       if (contentLength) size = Number.parseInt(contentLength);
     }
-    if (size > 41943040 && extraReturnTypes) {
+
+    if (size > 41943040) {
       // 40 MB
-      type = "large";
-      return { type };
+      throw "large";
     }
-    const typeHeader = mediaRequest.headers.get("content-type");
-    if (typeHeader) {
-      type = typeHeader;
-      const typePrefix = typeHeader.split("/")[0];
-      if (typePrefix !== "image") return;
-      mediaType = typePrefix;
-    } else {
-      const timeout = setTimeout(() => {
-        controller.abort();
-      }, 3000);
-      const bufRequest = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          range: "bytes=0-1023",
-        },
-      });
-      clearTimeout(timeout);
-      if (bufRequest.body) {
-        const fileType = await fileTypeFromStream(bufRequest.body);
-        if (fileType) {
-          if (
-            ![...(typeMedia.length === 0 ? formats.image : typeMedia.flatMap((v) => formats[v]))].includes(
-              fileType.mime,
-            )
-          )
-            return;
 
-          const typePrefix = fileType.mime.split("/")[0] as MediaParams["type"];
-          if (!typeMedia.includes(typePrefix)) return;
-          mediaType = typePrefix;
+    if (!res.body) return;
 
-          if (mediaType) type = fileType.mime;
-        }
-      }
+    stream = await fileTypeStream(res.body, { sampleSize: 1024 });
+    if (!stream.fileType?.mime) {
+      await stream.cancel();
+      return;
     }
   } finally {
     clearTimeout(timeout);
   }
-  return { type, url, mediaType };
+
+  if (
+    ![...(typeMedia.length === 0 ? formats.image : typeMedia.flatMap((v) => formats[v]))].includes(stream.fileType.mime)
+  ) {
+    await stream.cancel();
+    return;
+  }
+
+  const mediaType = stream.fileType.mime.split("/")[0] as MediaTypes;
+  if (!typeMedia.includes(mediaType)) {
+    await stream.cancel();
+    return;
+  }
+
+  const type = stream.fileType.mime;
+  const ext = stream.fileType.ext;
+  if (typeOnly) {
+    await stream.cancel();
+    return { url, type, ext, mediaType };
+  }
+
+  const reader = stream.getReader();
+  const bufs: Uint8Array[] = [];
+  let bufSize = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    bufs.push(value);
+    bufSize += value.byteLength;
+
+    if (size && bufSize >= size) break;
+
+    if (bufSize > 41943040) {
+      await stream.cancel();
+      // 40 MB
+      throw "large";
+    }
+  }
+
+  if (!stream.locked) await stream.cancel();
+
+  const buf = Buffer.concat(bufs);
+  return { buf, ext, url, type, mediaType };
 }
 
 function connect(server: string, auth: string | undefined, name: string | undefined, tls?: boolean) {
@@ -161,31 +222,44 @@ export async function reloadMediaConnections() {
 }
 
 async function getIdeal(object: MediaParams): Promise<MediaConnection | undefined> {
-  const idealServers = [];
+  const idealServers: Array<
+    | {
+        connection: MediaConnection;
+        count: number;
+      }
+    | undefined
+  > = [];
   for (const connection of connections.values()) {
     if (connection.conn.readyState !== 1) {
       continue;
     }
-    if (!connection.funcs[object.type]?.includes(object.cmd)) {
-      idealServers.push(null);
+    if (!connection.types[object.cmd] || connection.types[object.cmd].length === 0) {
+      idealServers.push(undefined);
       continue;
     }
-    if (object.input?.type && !connection.formats[object.type]?.[object.cmd]?.includes(object.input.type)) continue;
-    idealServers.push(connection);
+    try {
+      const count = await connection.getCount();
+      idealServers.push({ connection, count });
+    } catch {
+      continue;
+    }
   }
   if (idealServers.length === 0) throw "No available servers";
-  return random(idealServers.filter((v) => !!v));
+  const sorted = idealServers.filter((v) => !!v).sort((a, b) => a.count - b.count);
+  if (sorted.length === 0) return;
+  return (sorted.every((v) => v.count === 0) ? random(sorted) : sorted[0]).connection;
 }
 
 let running = 0;
 
-export async function runMediaJob(params: MediaParams): Promise<{ buffer: Buffer; type: string }> {
+export async function runMediaJob(params: MediaParams): Promise<{ buffer: Buffer; type: string; spoiler: boolean }> {
   if (process.env.API_TYPE === "ws") {
     const currentServer = await getIdeal(params);
     if (!currentServer)
       return {
         buffer: Buffer.alloc(0),
         type: "nocmd",
+        spoiler: false,
       };
     try {
       await currentServer.queue(BigInt(params.id), params);
@@ -194,6 +268,7 @@ export async function runMediaJob(params: MediaParams): Promise<{ buffer: Buffer
         return {
           buffer: result.data,
           type: "sent",
+          spoiler: false,
         };
       const output = await currentServer.getOutput(params.id);
       return output;
@@ -206,6 +281,7 @@ export async function runMediaJob(params: MediaParams): Promise<{ buffer: Buffer
     return {
       buffer: Buffer.alloc(0),
       type: "noresult",
+      spoiler: false,
     };
   }
   if (run) {
@@ -218,10 +294,7 @@ export async function runMediaJob(params: MediaParams): Promise<{ buffer: Buffer
         mediaLib.trim();
       }
     });
-    return {
-      buffer: Buffer.from([...data.buffer]),
-      type: data.fileExtension,
-    };
+    return data;
   }
   throw "media_not_working";
 }

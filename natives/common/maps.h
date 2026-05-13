@@ -1,3 +1,5 @@
+#include <vector>
+
 #include "../image/commands.h"
 #include "argmap.h"
 
@@ -62,6 +64,12 @@ namespace esmb {
         {"sonic",    &Sonic   }
     };
 
+    const std::vector<std::string> AnimFunctions = {
+      "freeze",
+      "reverse",
+      "speed",
+    };
+
     const std::map<std::string, FunctionArgs *> FunctionArgsMap = {
       {"blur",       &BlurArgs      },
       {"caption",    &CaptionArgs   },
@@ -90,6 +98,7 @@ namespace esmb {
       {"snapchat",   &SnapchatArgs  },
       {"sonic",      &SonicArgs     },
       {"speed",      &SpeedArgs     },
+      {"spin",       &SpinArgs      },
       {"spotify",    &SpotifyArgs   },
       {"uncanny",    &UncannyArgs   },
       {"uncaption",  &UncaptionArgs },

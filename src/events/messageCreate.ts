@@ -2,19 +2,18 @@ import { Buffer } from "node:buffer";
 import process from "node:process";
 import { type AnyTextableChannel, GroupChannel, type Message, PrivateChannel, ThreadChannel } from "oceanic.js";
 import Command from "#cmd-classes/command.js";
-import MediaCommand from "#cmd-classes/mediaCommand.js";
 import { aliases, commands, disabledCache, disabledCmdCache, prefixCache } from "#utils/collections.js";
 import detectRuntime from "#utils/detectRuntime.js";
 import { getString } from "#utils/i18n.js";
-import { error as _error, log } from "#utils/logger.js";
+import logger from "#utils/logger.js";
 import { clean } from "#utils/misc.js";
 import parseCommand from "#utils/parseCommand.js";
-import { upload } from "#utils/tempimages.js";
 import type { DBGuild, EventParams } from "#utils/types.js";
 
-let Sentry: typeof import("@sentry/node");
+let Sentry: typeof import("@sentry/node-core") | undefined;
 if (process.env.SENTRY_DSN && process.env.SENTRY_DSN !== "") {
-  Sentry = await import(`@sentry/${detectRuntime().type}`);
+  const { type } = detectRuntime();
+  Sentry = await import(`@sentry/${type === "node" ? "node-core/light" : type}`);
 }
 
 let mentionRegex: RegExp;
@@ -28,6 +27,9 @@ export default async ({ client, database }: EventParams, message: Message) => {
 
   // ignore other bots
   if (message.author.bot) return;
+
+  // ignore when message content is missing
+  if (message.content === "") return;
 
   // don't run command if bot can't send messages
   let permChannel: AnyTextableChannel | undefined;
@@ -82,33 +84,32 @@ export default async ({ client, database }: EventParams, message: Message) => {
   const preArgs = text.split(/\s+/g);
   const shifted = preArgs.shift();
   if (!shifted) return;
-  const cmdBaseName = shifted.toLowerCase();
-  let aliased = aliases.get(cmdBaseName);
-  if (aliased?.includes(" ")) {
-    const subSplit = aliased.split(" ");
-    aliased = subSplit[0];
-    preArgs.unshift(...subSplit.slice(1));
-  }
+  const command = shifted.toLowerCase();
+  const aliased = aliases.get(command);
 
-  const cmdName = aliased ?? cmdBaseName;
+  const cmdName = aliased ?? command;
 
   // check if command exists and if it's enabled
   const cmdBase = commands.get(cmdName);
   if (!cmdBase) return;
 
-  let command = cmdBaseName;
-  let cmd = cmdBase.default as typeof Command;
+  let cmd = cmdBase as typeof Command;
   if (!(cmd.prototype instanceof Command)) return;
 
   // parse args
   const parsed = parseCommand(preArgs);
   let canon = cmdName;
-  const lowerSub = parsed.args[0]?.toLowerCase();
-  if (cmdBase[lowerSub]?.prototype instanceof Command) {
-    cmd = cmdBase[lowerSub] as typeof Command;
-    canon = `${canon} ${lowerSub}`;
-    if (!aliased) command = `${command} ${lowerSub}`;
-    parsed.args = parsed.args.slice(1);
+  if (cmdBase.baseCommand) {
+    const lowerSub = parsed.args.map((v) => v.toLowerCase());
+    for (const sub of lowerSub) {
+      const newCanon = `${canon} ${sub}`;
+      const subAlias = aliases.get(newCanon);
+      const subCmd = commands.get(subAlias ?? newCanon);
+      if (!subCmd) break;
+      cmd = subCmd as typeof Command;
+      canon = newCanon;
+      parsed.args = parsed.args.slice(1);
+    }
   }
 
   if (!cmd) return;
@@ -143,7 +144,7 @@ export default async ({ client, database }: EventParams, message: Message) => {
   }
 
   // actually run the command
-  log("log", `${message.author.username} (${message.author.id}) ran classic command ${command}`);
+  logger.log("log", `${message.author.username} (${message.author.id}) ran classic command ${command}`);
   const reference = {
     messageReference: {
       channelID: message.channelID,
@@ -168,9 +169,11 @@ export default async ({ client, database }: EventParams, message: Message) => {
     const result = await commandClass.run();
     const endTime = new Date();
     if (endTime.getTime() - startTime.getTime() >= 180000) reference.allowedMentions.repliedUser = true;
+
+    let res;
     if (typeof result === "string") {
       reference.allowedMentions.repliedUser = true;
-      await client.rest.channels.createMessage(
+      res = await client.rest.channels.createMessage(
         message.channelID,
         Object.assign(
           {
@@ -180,52 +183,21 @@ export default async ({ client, database }: EventParams, message: Message) => {
         ),
       );
     } else if (typeof result === "object") {
-      if (commandClass instanceof MediaCommand && result.files) {
-        let fileSize = 10485760;
-        if (message.guild) {
-          switch (message.guild.premiumTier) {
-            case 2:
-              fileSize = 52428800;
-              break;
-            case 3:
-              fileSize = 104857600;
-              break;
-          }
-        }
-        const file = result.files[0];
-        if (file.contents.length > fileSize) {
-          if (process.env.TEMPDIR && process.env.TEMPDIR !== "" && commandClass.permissions.has("EMBED_LINKS")) {
-            await upload(client, { ...file, flags: result.flags }, message);
-          } else {
-            await client.rest.channels.createMessage(message.channelID, {
-              content: getString("image.noTempServer"),
-            });
-          }
-        } else {
-          await client.rest.channels.createMessage(
-            message.channelID,
-            Object.assign(
-              {
-                files: [file],
-              },
-              reference,
-            ),
-          );
-        }
-      } else {
-        await client.rest.channels.createMessage(message.channelID, Object.assign(result, reference));
-      }
+      res = await client.rest.channels.createMessage(message.channelID, Object.assign(result, reference));
+    } else {
+      logger.debug(`Unknown return type for command ${cmdName}: ${result} (${typeof result})`);
     }
+
+    await commandClass.finalize(res);
   } catch (e) {
     const error = e as Error;
-    if (process.env.SENTRY_DSN && process.env.SENTRY_DSN !== "")
-      Sentry.captureException(error, {
-        tags: {
-          process: process.env.pm_id ? Number.parseInt(process.env.pm_id) - 1 : 0,
-          command,
-          args: JSON.stringify(preArgs),
-        },
-      });
+    Sentry?.captureException(error, {
+      tags: {
+        process: process.env.pm_id ? Number.parseInt(process.env.pm_id) - 1 : 0,
+        command,
+        args: JSON.stringify(preArgs),
+      },
+    });
     if (error.toString().includes("Request entity too large")) {
       await client.rest.channels.createMessage(
         message.channelID,
@@ -257,7 +229,7 @@ export default async ({ client, database }: EventParams, message: Message) => {
         ),
       );
     } else {
-      _error(`Error occurred with command message ${message.content}: ${(error as Error).stack || error}`);
+      logger.error(`Error occurred with command message ${message.content}: ${(error as Error).stack || error}`);
       try {
         await client.rest.channels.createMessage(
           message.channelID,
@@ -288,7 +260,7 @@ export default async ({ client, database }: EventParams, message: Message) => {
           ),
         );
       } catch (err) {
-        _error(
+        logger.error(
           `While attempting to send the previous error message, another error occurred: ${(err as Error).stack || err}`,
         );
       }

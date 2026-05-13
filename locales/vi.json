@@ -732,7 +732,6 @@
                 "disabled": "Tỗi đã bị tắt trong kênh này. Để bật lại, chỉ cần chạy lênh `{{prefix}}channel enable`.",
                 "invalid": "Đó không phải là một lựa chọn hợp lệ!",
                 "notDisabled": "Tôi không bị tắt trong kênh này!",
-                "noCmd": "Bạn cần phải chọn xem bạn muốn bật hay tắt tôi trong kênh này!",
                 "notInServer": "Cái kênh đó làm gì có trong máy chủ này!",
                 "reEnabled": "Tôi đã được bật lại trong kênh này."
             },
@@ -744,7 +743,6 @@
                 "disabled": "Lệnh `{{command}}` đã được tắt. Để bật lại, chỉ cần chạy lệnh `{{prefix}}command enable {{command}}`.",
                 "invalidCmd": "Làm gì có lệnh đó!",
                 "notDisabled": "Lệnh đó chưa được tắt!",
-                "noCmd": "Bạn cần chọn xem bạn muốn bật hay tắt lệnh!",
                 "noInput": "Bạn phải cung cấp lệnh mà bạn muốn bặt/tắt!",
                 "reEnabled": "Lệnh `{{command}}` đã được bật lại."
             },
@@ -941,7 +939,6 @@
         },
         "tempImageSent": "Ảnh của bạn đây nhé!",
         "notWorking": "Có vẻ như tôi không thể xử lý được tấm ảnh này, điều này có thể do cấu hình của tôi chưa được thiết lập đúng cách. Bạn có thể liên hệ với người sở hữu bot để được hỗ trợ.",
-        "badurl": "URL không hợp lệ!",
         "couldNotFind": "Tôi không thể tìm thấy ảnh trong tin nhắn ấy!",
         "empty": "Kết quả được trở về là trống!",
         "flags": {
@@ -963,7 +960,6 @@
         "noServers": "Có vẻ là tôi không thể liên lạc với các server hình ảnh, chắc có thể là chúng đang gặp sự cố hoặc đang khởi động lại. Vui lòng chờ một chút nhé.",
         "noParam": "Bạn phải thêm nội dung chứ!",
         "processing": "Đang xử lý... Xin hãy chờ chút nhé",
-        "tenor": "Tôi đã bị giới hạn yêu cầu bởi Tenor. Vui lòng thử tải GIF của bạn ở chỗ khác.",
         "ratelimit": "Có vẻ như server lưu trữ hình ảnh đã giới hạn yêu cầu của tôi. Bạn có thể thử tải hình ảnh lên ở chỗ khác.",
         "timeout": "Yêu cầu để tải ảnh đã hết hạn. Vui lòng thử lại, hay tải ảnh của bạn ở chỗ khác, hoặc là sử dụng ảnh khác.",
         "selected": "Tấm ảnh này đã được chọn cho lệnh tiếp theo của bạn.",

@@ -9,11 +9,11 @@ class RestartCommand extends Command {
       this.success = false;
       return this.getString("commands.responses.restart.owner");
     }
-    try {
-      return this.getString("commands.responses.restart.restarting");
-    } finally {
-      await exit(this.client, this.database);
-    }
+    return this.getString("commands.responses.restart.restarting");
+  }
+
+  async finalize() {
+    await exit(this.client, this.database);
   }
 
   static description = "Restarts me";
